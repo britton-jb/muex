@@ -31,7 +31,8 @@ defmodule Muex.ConfigTest do
       assert Muex.Mutator.Guard in config.mutators
       assert Muex.Mutator.CaseClause in config.mutators
       assert Muex.Mutator.CondClause in config.mutators
-      assert length(config.mutators) == 15
+      assert Muex.Mutator.ExtendedMath in config.mutators
+      assert length(config.mutators) == 16
     end
 
     test "parses --files flag" do
