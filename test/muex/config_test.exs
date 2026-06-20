@@ -107,6 +107,16 @@ defmodule Muex.ConfigTest do
       assert config.tce == true
     end
 
+    test "since defaults to nil (whole-codebase run)" do
+      assert {:ok, config} = Config.from_args([])
+      assert config.since == nil
+    end
+
+    test "parses --since <ref>" do
+      assert {:ok, config} = Config.from_args(["--since", "main"])
+      assert config.since == "main"
+    end
+
     test "returns error for invalid optimize level" do
       assert {:error, msg} = Config.from_args(["--optimize-level", "ludicrous"])
       assert msg =~ "Unknown optimization level"

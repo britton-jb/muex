@@ -105,4 +105,32 @@ defmodule Muex.GitDiffTest do
       assert GitDiff.changed_lines("") == %{}
     end
   end
+
+  describe "filter_mutations/2" do
+    setup do
+      changed = %{"lib/a.ex" => MapSet.new([10, 11]), "lib/b.ex" => MapSet.new([5])}
+
+      mutations = [
+        %{location: %{file: "lib/a.ex", line: 10}},
+        %{location: %{file: "lib/a.ex", line: 99}},
+        %{location: %{file: "lib/b.ex", line: 5}},
+        %{location: %{file: "lib/c.ex", line: 5}}
+      ]
+
+      %{changed: changed, mutations: mutations}
+    end
+
+    test "keeps only mutations on changed lines of changed files", ctx do
+      kept = GitDiff.filter_mutations(ctx.mutations, ctx.changed)
+
+      assert kept == [
+               %{location: %{file: "lib/a.ex", line: 10}},
+               %{location: %{file: "lib/b.ex", line: 5}}
+             ]
+    end
+
+    test "returns all mutations unchanged when given nil (no --since)", ctx do
+      assert GitDiff.filter_mutations(ctx.mutations, nil) == ctx.mutations
+    end
+  end
 end

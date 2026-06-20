@@ -44,6 +44,24 @@ defmodule Muex.GitDiff do
     e -> {:error, Exception.message(e)}
   end
 
+  @doc """
+  Keeps only the mutations whose location falls on a changed line.
+
+  `changed` is a map as returned by `changed_lines/1`/`changed_since/2`, or
+  `nil` to disable filtering (returns every mutation unchanged).
+  """
+  @spec filter_mutations([map()], map() | nil) :: [map()]
+  def filter_mutations(mutations, nil), do: mutations
+
+  def filter_mutations(mutations, changed) when is_map(changed) do
+    Enum.filter(mutations, fn mutation ->
+      case Map.get(changed, mutation.location.file) do
+        nil -> false
+        lines -> MapSet.member?(lines, mutation.location.line)
+      end
+    end)
+  end
+
   # New-file path line: `+++ b/path` (or `+++ /dev/null` for deletions).
   defp parse_line("+++ /dev/null", {_path, acc}), do: {:skip, acc}
 

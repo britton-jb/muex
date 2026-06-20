@@ -96,26 +96,56 @@ defmodule Muex do
   end
 
   defp do_run(config, all_files) do
-    files = maybe_filter(all_files, config)
+    case resolve_changed(config) do
+      {:error, reason} ->
+        {:error, reason}
 
-    log("Generating mutations...", config.verbose)
+      {:ok, changed} ->
+        files =
+          all_files
+          |> maybe_filter(config)
+          |> scope_to_changed_files(changed)
 
-    all_mutations =
-      files
-      |> Enum.flat_map(fn file ->
-        context = %{file: file.path}
-        Muex.Mutator.walk(file.ast, config.mutators, context)
-      end)
-      |> drop_equivalent(config)
-      |> maybe_optimize(config)
-      |> maybe_cap(config)
+        log("Generating mutations...", config.verbose)
 
-    if all_mutations == [] do
-      {:ok, %{results: [], score_low: 0.0, score_high: 0.0}}
-    else
-      run_mutations(config, files, all_mutations)
+        all_mutations =
+          files
+          |> Enum.flat_map(fn file ->
+            context = %{file: file.path}
+            Muex.Mutator.walk(file.ast, config.mutators, context)
+          end)
+          |> Muex.GitDiff.filter_mutations(changed)
+          |> drop_equivalent(config)
+          |> maybe_optimize(config)
+          |> maybe_cap(config)
+
+        if all_mutations == [] do
+          {:ok, %{results: [], score_low: 0.0, score_high: 0.0}}
+        else
+          run_mutations(config, files, all_mutations)
+        end
     end
   end
+
+  # `nil` means no --since: run over everything. Otherwise resolve the diff
+  # against the given ref once, up front.
+  defp resolve_changed(%Muex.Config{since: nil}), do: {:ok, nil}
+
+  defp resolve_changed(%Muex.Config{since: ref} = config) do
+    case Muex.GitDiff.changed_since(ref, cd: config.project_root) do
+      {:ok, changed} ->
+        log("Scoping to #{map_size(changed)} file(s) changed since #{ref}", config.verbose)
+        {:ok, changed}
+
+      {:error, reason} ->
+        {:error, "git diff against #{ref} failed: #{reason}"}
+    end
+  end
+
+  defp scope_to_changed_files(files, nil), do: files
+
+  defp scope_to_changed_files(files, changed),
+    do: Enum.filter(files, &Map.has_key?(changed, &1.path))
 
   defp maybe_filter(files, %Muex.Config{filter: false} = config) do
     log("Skipping file filtering", config.verbose)

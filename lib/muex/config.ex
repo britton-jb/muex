@@ -76,6 +76,7 @@ defmodule Muex.Config do
           verbose: boolean(),
           optimize: boolean(),
           tce: boolean(),
+          since: String.t() | nil,
           optimize_level: String.t(),
           min_complexity: non_neg_integer() | nil,
           max_per_function: pos_integer() | nil
@@ -98,6 +99,7 @@ defmodule Muex.Config do
     verbose: false,
     optimize: true,
     tce: true,
+    since: nil,
     optimize_level: "balanced",
     min_complexity: nil,
     max_per_function: nil
@@ -123,6 +125,7 @@ defmodule Muex.Config do
                no_optimize: :boolean,
                tce: :boolean,
                no_tce: :boolean,
+               since: :string,
                optimize_level: :string,
                min_complexity: :integer,
                max_per_function: :integer
@@ -168,6 +171,7 @@ defmodule Muex.Config do
         verbose: Keyword.get(opts, :verbose, false),
         optimize: resolve_optimize(opts),
         tce: resolve_tce(opts),
+        since: Keyword.get(opts, :since),
         optimize_level: optimize_level,
         min_complexity: Keyword.get(opts, :min_complexity),
         max_per_function: Keyword.get(opts, :max_per_function)

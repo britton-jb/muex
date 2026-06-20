@@ -25,6 +25,8 @@ defmodule Mix.Tasks.Muex do
     * `--optimize` - Enable mutation optimization heuristics (default: enabled)
     * `--no-optimize` - Disable mutation optimization heuristics
     * `--no-tce` - Disable Trivial Compiler Equivalence skipping (default: enabled)
+    * `--since` - Only mutate lines changed since a git ref (e.g. `--since main`),
+      i.e. the lines added/modified on this branch. Ideal for PR/CI runs.
 
   ## Score precision and CI gates
 
