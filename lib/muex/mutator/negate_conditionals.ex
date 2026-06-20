@@ -31,18 +31,16 @@ defmodule Muex.Mutator.NegateConditionals do
   def mutate({op, meta, [_left, _right] = args}, context)
       when is_map_key(@complements, op) do
     complement = Map.fetch!(@complements, op)
+    mutated = {complement, meta, args}
 
     [
-      %{
-        original_ast: {op, meta, args},
-        ast: {complement, meta, args},
-        mutator: __MODULE__,
-        description: "#{name()}: #{op} to #{complement}",
-        location: %{
-          file: Map.get(context, :file, "unknown"),
-          line: Keyword.get(meta, :line, 0)
-        }
-      }
+      Muex.Mutator.build_mutation(
+        __MODULE__,
+        mutated,
+        "#{op} to #{complement}",
+        context,
+        Keyword.get(meta, :line, 0)
+      )
     ]
   end
 

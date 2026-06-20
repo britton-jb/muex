@@ -133,6 +133,26 @@ defmodule Muex.Mutator do
   def equivalent?(_mutation), do: false
 
   @doc """
+  Builds a mutation map from the common fields every mutator shares.
+
+  Centralises the mutation shape so individual mutators only describe *what*
+  they change. The `description` is prefixed with the mutator's `name/0`, and
+  the file falls back to `"unknown"` when the context omits it.
+
+  `:original_ast` is deliberately not set here — `walk/3` stamps it onto every
+  mutation from the matched node, so setting it in a mutator would be redundant.
+  """
+  @spec build_mutation(module(), term(), String.t(), map(), non_neg_integer()) :: mutation()
+  def build_mutation(mutator, mutated_ast, description, context, line) do
+    %{
+      ast: mutated_ast,
+      mutator: mutator,
+      description: "#{mutator.name()}: #{description}",
+      location: %{file: Map.get(context, :file, "unknown"), line: line}
+    }
+  end
+
+  @doc """
   Walks through an AST and applies all registered mutators.
 
   ## Parameters

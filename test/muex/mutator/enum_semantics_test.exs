@@ -41,6 +41,25 @@ defmodule Muex.Mutator.EnumSemanticsTest do
       assert EnumSemantics.mutate(enum_call(:map, 1), %{}) |> mutated_fun() == :each
     end
 
+    test "every supported function swaps to its opposite (both directions)" do
+      swaps = [
+        {:filter, :reject},
+        {:reject, :filter},
+        {:all?, :any?},
+        {:any?, :all?},
+        {:min, :max},
+        {:max, :min},
+        {:take, :drop},
+        {:drop, :take},
+        {:map, :each},
+        {:each, :map}
+      ]
+
+      for {fun, opposite} <- swaps do
+        assert EnumSemantics.mutate(enum_call(fun, 1), %{}) |> mutated_fun() == opposite
+      end
+    end
+
     test "preserves the call arguments" do
       [mutation] = EnumSemantics.mutate(enum_call(:filter, 7), %{file: "test.ex"})
       {{:., _, [{:__aliases__, _, [:Enum]}, :reject]}, _, args} = mutation.ast

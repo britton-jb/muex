@@ -47,6 +47,8 @@ defmodule Muex.Mutator.NegateConditionalsTest do
     test "ignores equality operators (left to Comparison mutator)" do
       assert [] = NegateConditionals.mutate({:==, [line: 1], [:a, :b]}, %{})
       assert [] = NegateConditionals.mutate({:!=, [line: 1], [:a, :b]}, %{})
+      assert [] = NegateConditionals.mutate({:===, [line: 1], [:a, :b]}, %{})
+      assert [] = NegateConditionals.mutate({:!==, [line: 1], [:a, :b]}, %{})
     end
 
     test "returns empty list for unrelated operators" do

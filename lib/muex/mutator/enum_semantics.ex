@@ -48,22 +48,16 @@ defmodule Muex.Mutator.EnumSemantics do
       )
       when is_map_key(@opposites, fun) do
     opposite = Map.fetch!(@opposites, fun)
-
-    mutated =
-      {{:., dot_meta, [{:__aliases__, alias_meta, [:Enum]}, opposite]}, call_meta, args}
+    mutated = {{:., dot_meta, [{:__aliases__, alias_meta, [:Enum]}, opposite]}, call_meta, args}
 
     [
-      %{
-        original_ast:
-          {{:., dot_meta, [{:__aliases__, alias_meta, [:Enum]}, fun]}, call_meta, args},
-        ast: mutated,
-        mutator: __MODULE__,
-        description: "#{name()}: Enum.#{fun} to Enum.#{opposite}",
-        location: %{
-          file: Map.get(context, :file, "unknown"),
-          line: Keyword.get(call_meta, :line, 0)
-        }
-      }
+      Muex.Mutator.build_mutation(
+        __MODULE__,
+        mutated,
+        "Enum.#{fun} to Enum.#{opposite}",
+        context,
+        Keyword.get(call_meta, :line, 0)
+      )
     ]
   end
 
