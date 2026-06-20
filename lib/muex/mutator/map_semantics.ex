@@ -15,6 +15,8 @@ defmodule Muex.Mutator.MapSemantics do
 
   @behaviour Muex.Mutator
 
+  alias Muex.Mutator.Builders
+
   @opposites %{put: :put_new, put_new: :put}
   @modules [:Map, :Keyword]
 
@@ -28,29 +30,6 @@ defmodule Muex.Mutator.MapSemantics do
   def supported_languages, do: [Muex.Language.Elixir]
 
   @impl true
-  def mutate(
-        {{:., dot_meta, [{:__aliases__, alias_meta, [mod]}, fun]}, call_meta, args},
-        context
-      )
-      when mod in @modules and is_map_key(@opposites, fun) do
-    opposite = Map.fetch!(@opposites, fun)
-
-    mutated =
-      {{:., dot_meta, [{:__aliases__, alias_meta, [mod]}, opposite]}, call_meta, args}
-
-    [
-      %{
-        original_ast: {{:., dot_meta, [{:__aliases__, alias_meta, [mod]}, fun]}, call_meta, args},
-        ast: mutated,
-        mutator: __MODULE__,
-        description: "#{name()}: #{mod}.#{fun} to #{mod}.#{opposite}",
-        location: %{
-          file: Map.get(context, :file, "unknown"),
-          line: Keyword.get(call_meta, :line, 0)
-        }
-      }
-    ]
-  end
-
-  def mutate(_ast, _context), do: []
+  def mutate(ast, context),
+    do: Builders.module_fn_swap(ast, context, __MODULE__, @modules, @opposites)
 end

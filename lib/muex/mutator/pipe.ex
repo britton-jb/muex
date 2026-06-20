@@ -15,6 +15,8 @@ defmodule Muex.Mutator.Pipe do
 
   @behaviour Muex.Mutator
 
+  alias Muex.Mutator.Builders
+
   @impl true
   def name, do: "Pipe"
 
@@ -25,19 +27,8 @@ defmodule Muex.Mutator.Pipe do
   def supported_languages, do: [Muex.Language.Elixir]
 
   @impl true
-  def mutate({:|>, meta, [left, right]}, context) do
-    [
-      %{
-        original_ast: {:|>, meta, [left, right]},
-        ast: left,
-        mutator: __MODULE__,
-        description: "#{name()}: drop pipe stage",
-        location: %{
-          file: Map.get(context, :file, "unknown"),
-          line: Keyword.get(meta, :line, 0)
-        }
-      }
-    ]
+  def mutate({:|>, meta, [left, _right]}, context) do
+    [Builders.build(__MODULE__, left, "drop pipe stage", context, Keyword.get(meta, :line, 0))]
   end
 
   def mutate(_ast, _context), do: []

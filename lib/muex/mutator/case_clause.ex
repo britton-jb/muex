@@ -14,6 +14,8 @@ defmodule Muex.Mutator.CaseClause do
 
   @behaviour Muex.Mutator
 
+  alias Muex.Mutator.Builders
+
   @impl true
   def name, do: "CaseClause"
 
@@ -26,24 +28,17 @@ defmodule Muex.Mutator.CaseClause do
   @impl true
   def mutate({:case, meta, [subject, [do: clauses]]}, context)
       when is_list(clauses) and length(clauses) >= 2 do
-    total = length(clauses)
+    rebuild = fn remaining -> {:case, meta, [subject, [do: remaining]]} end
+    positions = Enum.to_list(0..(length(clauses) - 1))
 
-    clauses
-    |> Enum.with_index()
-    |> Enum.map(fn {_clause, index} ->
-      remaining = List.delete_at(clauses, index)
-
-      %{
-        original_ast: {:case, meta, [subject, [do: clauses]]},
-        ast: {:case, meta, [subject, [do: remaining]]},
-        mutator: __MODULE__,
-        description: "#{name()}: delete clause #{index + 1} of #{total}",
-        location: %{
-          file: Map.get(context, :file, "unknown"),
-          line: Keyword.get(meta, :line, 0)
-        }
-      }
-    end)
+    Builders.clause_deletions(
+      __MODULE__,
+      clauses,
+      positions,
+      rebuild,
+      context,
+      Keyword.get(meta, :line, 0)
+    )
   end
 
   def mutate(_ast, _context), do: []

@@ -16,6 +16,8 @@ defmodule Muex.Mutator.NegateConditionals do
 
   @behaviour Muex.Mutator
 
+  alias Muex.Mutator.Builders
+
   @complements %{<: :>=, >: :<=, <=: :>, >=: :<}
 
   @impl true
@@ -28,23 +30,5 @@ defmodule Muex.Mutator.NegateConditionals do
   def supported_languages, do: [Muex.Language.Elixir, Muex.Language.Erlang]
 
   @impl true
-  def mutate({op, meta, [_left, _right] = args}, context)
-      when is_map_key(@complements, op) do
-    complement = Map.fetch!(@complements, op)
-
-    [
-      %{
-        original_ast: {op, meta, args},
-        ast: {complement, meta, args},
-        mutator: __MODULE__,
-        description: "#{name()}: #{op} to #{complement}",
-        location: %{
-          file: Map.get(context, :file, "unknown"),
-          line: Keyword.get(meta, :line, 0)
-        }
-      }
-    ]
-  end
-
-  def mutate(_ast, _context), do: []
+  def mutate(ast, context), do: Builders.operator_swap(ast, context, __MODULE__, @complements)
 end

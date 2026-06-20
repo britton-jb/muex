@@ -14,6 +14,8 @@ defmodule Muex.Mutator.WithClause do
 
   @behaviour Muex.Mutator
 
+  alias Muex.Mutator.Builders
+
   @impl true
   def name, do: "WithClause"
 
@@ -35,7 +37,16 @@ defmodule Muex.Mutator.WithClause do
       |> Enum.map(fn {_clause, index} -> index end)
 
     if block_with_do?(block) and length(arrow_positions) >= 2 do
-      build_deletions(arrow_positions, leading, block, meta, context)
+      rebuild = fn remaining -> {:with, meta, remaining ++ [block]} end
+
+      Builders.clause_deletions(
+        __MODULE__,
+        leading,
+        arrow_positions,
+        rebuild,
+        context,
+        Keyword.get(meta, :line, 0)
+      )
     else
       []
     end
@@ -44,25 +55,4 @@ defmodule Muex.Mutator.WithClause do
   def mutate(_ast, _context), do: []
 
   defp block_with_do?(block), do: Keyword.keyword?(block) and Keyword.has_key?(block, :do)
-
-  defp build_deletions(arrow_positions, leading, block, meta, context) do
-    total = length(arrow_positions)
-
-    arrow_positions
-    |> Enum.with_index()
-    |> Enum.map(fn {position, nth} ->
-      remaining = List.delete_at(leading, position)
-
-      %{
-        original_ast: {:with, meta, leading ++ [block]},
-        ast: {:with, meta, remaining ++ [block]},
-        mutator: __MODULE__,
-        description: "#{name()}: delete clause #{nth + 1} of #{total}",
-        location: %{
-          file: Map.get(context, :file, "unknown"),
-          line: Keyword.get(meta, :line, 0)
-        }
-      }
-    end)
-  end
 end

@@ -16,6 +16,8 @@ defmodule Muex.Mutator.Guard do
 
   @behaviour Muex.Mutator
 
+  alias Muex.Mutator.Builders
+
   @impl true
   def name, do: "Guard"
 
@@ -26,18 +28,17 @@ defmodule Muex.Mutator.Guard do
   def supported_languages, do: [Muex.Language.Elixir]
 
   @impl true
-  def mutate({:when, meta, [head, guard]}, context) do
+  def mutate({:when, meta, [head, _guard]}, context) do
+    mutated = {:when, meta, [head, true]}
+
     [
-      %{
-        original_ast: {:when, meta, [head, guard]},
-        ast: {:when, meta, [head, true]},
-        mutator: __MODULE__,
-        description: "#{name()}: replace guard with true",
-        location: %{
-          file: Map.get(context, :file, "unknown"),
-          line: Keyword.get(meta, :line, 0)
-        }
-      }
+      Builders.build(
+        __MODULE__,
+        mutated,
+        "replace guard with true",
+        context,
+        Keyword.get(meta, :line, 0)
+      )
     ]
   end
 
