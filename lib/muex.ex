@@ -142,9 +142,11 @@ defmodule Muex do
     end
   end
 
-  defp scope_to_changed_files(files, nil), do: files
+  @doc false
+  # Public only so the file-scoping can be unit-tested directly.
+  def scope_to_changed_files(files, nil), do: files
 
-  defp scope_to_changed_files(files, changed),
+  def scope_to_changed_files(files, changed),
     do: Enum.filter(files, &Map.has_key?(changed, &1.path))
 
   defp maybe_filter(files, %Muex.Config{filter: false} = config) do

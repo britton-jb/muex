@@ -106,6 +106,53 @@ defmodule Muex.GitDiffTest do
     end
   end
 
+  describe "changed_since/2 (real git)" do
+    @describetag :tmp_dir
+
+    defp git!(args, dir), do: {_, 0} = System.cmd("git", args, cd: dir, stderr_to_stdout: true)
+
+    setup %{tmp_dir: dir} do
+      git!(["init", "-q"], dir)
+      git!(["config", "user.email", "t@example.com"], dir)
+      git!(["config", "user.name", "Test"], dir)
+      %{dir: dir}
+    end
+
+    test "returns the lines modified on the branch since a ref", %{dir: dir} do
+      file = Path.join(dir, "calc.ex")
+      File.write!(file, "one\ntwo\nthree\n")
+      git!(["add", "."], dir)
+      git!(["commit", "-q", "-m", "init"], dir)
+
+      File.write!(file, "one\nCHANGED\nthree\n")
+      git!(["commit", "-q", "-am", "change line 2"], dir)
+
+      assert GitDiff.changed_since("HEAD~1", cd: dir) == {:ok, %{"calc.ex" => MapSet.new([2])}}
+    end
+
+    test "records every line of a newly added file", %{dir: dir} do
+      File.write!(Path.join(dir, "seed.ex"), "x\n")
+      git!(["add", "."], dir)
+      git!(["commit", "-q", "-m", "seed"], dir)
+
+      File.write!(Path.join(dir, "added.ex"), "a\nb\n")
+      git!(["add", "."], dir)
+      git!(["commit", "-q", "-m", "add file"], dir)
+
+      assert {:ok, changed} = GitDiff.changed_since("HEAD~1", cd: dir)
+      assert changed == %{"added.ex" => MapSet.new([1, 2])}
+    end
+
+    test "returns an error for an unknown ref", %{dir: dir} do
+      File.write!(Path.join(dir, "x.ex"), "x\n")
+      git!(["add", "."], dir)
+      git!(["commit", "-q", "-m", "init"], dir)
+
+      assert {:error, reason} = GitDiff.changed_since("no-such-ref-xyz", cd: dir)
+      assert is_binary(reason)
+    end
+  end
+
   describe "filter_mutations/2" do
     setup do
       changed = %{"lib/a.ex" => MapSet.new([10, 11]), "lib/b.ex" => MapSet.new([5])}

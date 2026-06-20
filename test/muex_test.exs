@@ -23,4 +23,18 @@ defmodule MuexTest do
                Muex.build_result([%{result: :equivalent}, %{result: :invalid}])
     end
   end
+
+  describe "scope_to_changed_files/2" do
+    test "passes all files through when changed is nil (no --since)" do
+      files = [%{path: "lib/a.ex"}, %{path: "lib/b.ex"}]
+      assert Muex.scope_to_changed_files(files, nil) == files
+    end
+
+    test "keeps only files present in the changed map" do
+      files = [%{path: "lib/a.ex"}, %{path: "lib/b.ex"}]
+      changed = %{"lib/a.ex" => MapSet.new([1])}
+
+      assert Muex.scope_to_changed_files(files, changed) == [%{path: "lib/a.ex"}]
+    end
+  end
 end

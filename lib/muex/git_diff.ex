@@ -71,28 +71,23 @@ defmodule Muex.GitDiff do
 
   defp parse_line(line, {path, acc}) do
     case Regex.run(@hunk, line) do
-      [_, start] -> {path, add_lines(acc, path, start, "1")}
-      [_, start, count] -> {path, add_lines(acc, path, start, count)}
+      [_, start] -> {path, add_lines(acc, path, to_int(start), 1)}
+      [_, start, count] -> {path, add_lines(acc, path, to_int(start), to_int(count))}
       nil -> {path, acc}
     end
   end
 
+  # No new-file path yet (or a deleted file), or a pure-deletion hunk: nothing
+  # to record.
   defp add_lines(acc, path, _start, _count) when path in [nil, :skip], do: acc
+  defp add_lines(acc, _path, _start, 0), do: acc
 
   defp add_lines(acc, path, start, count) do
-    start = String.to_integer(start)
-    count = String.to_integer(count)
-
-    case count do
-      0 ->
-        acc
-
-      _ ->
-        Map.update(acc, path, line_set(start, count), &MapSet.union(&1, line_set(start, count)))
-    end
+    lines = MapSet.new(start..(start + count - 1))
+    Map.update(acc, path, lines, &MapSet.union(&1, lines))
   end
 
-  defp line_set(start, count), do: MapSet.new(start..(start + count - 1))
+  defp to_int(string), do: String.to_integer(string)
 
   # Diff paths are prefixed with `b/`; a `b/` literally named file would be rare
   # but we only strip the conventional prefix.
