@@ -25,13 +25,16 @@ defmodule Muex.Mutator.InvertNegatives do
   @impl true
   def mutate({:-, meta, [operand]}, context) do
     [
-      Muex.Mutator.build_mutation(
-        __MODULE__,
-        operand,
-        "-x to x",
-        context,
-        Keyword.get(meta, :line, 0)
-      )
+      %{
+        original_ast: {:-, meta, [operand]},
+        ast: operand,
+        mutator: __MODULE__,
+        description: "#{name()}: -x to x",
+        location: %{
+          file: Map.get(context, :file, "unknown"),
+          line: Keyword.get(meta, :line, 0)
+        }
+      }
     ]
   end
 
