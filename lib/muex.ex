@@ -106,6 +106,7 @@ defmodule Muex do
         context = %{file: file.path}
         Muex.Mutator.walk(file.ast, config.mutators, context)
       end)
+      |> drop_equivalent(config)
       |> maybe_optimize(config)
       |> maybe_cap(config)
 
@@ -133,6 +134,14 @@ defmodule Muex do
     )
 
     included
+  end
+
+  # Always-on, sound: equivalent mutants can never be killed, so dropping them
+  # is a correctness step independent of the (lossy) --optimize sampling.
+  defp drop_equivalent(mutations, %Muex.Config{verbose: verbose}) do
+    kept = Muex.Equivalence.filter_equivalent(mutations)
+    log("Dropped #{length(mutations) - length(kept)} equivalent mutant(s)", verbose)
+    kept
   end
 
   defp maybe_optimize(mutations, %Muex.Config{optimize: false}), do: mutations
