@@ -24,6 +24,7 @@ defmodule Mix.Tasks.Muex do
     * `--verbose` - Show detailed progress information (file analysis, optimization, etc.)
     * `--optimize` - Enable mutation optimization heuristics (default: enabled)
     * `--no-optimize` - Disable mutation optimization heuristics
+    * `--no-tce` - Disable Trivial Compiler Equivalence skipping (default: enabled)
 
   ## Score precision and CI gates
 

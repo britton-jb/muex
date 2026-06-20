@@ -92,6 +92,21 @@ defmodule Muex.ConfigTest do
       assert config.optimize == true
     end
 
+    test "enables TCE (compiler-equivalence skipping) by default" do
+      assert {:ok, config} = Config.from_args([])
+      assert config.tce == true
+    end
+
+    test "parses --no-tce" do
+      assert {:ok, config} = Config.from_args(["--no-tce"])
+      assert config.tce == false
+    end
+
+    test "parses --tce explicitly" do
+      assert {:ok, config} = Config.from_args(["--tce"])
+      assert config.tce == true
+    end
+
     test "returns error for invalid optimize level" do
       assert {:error, msg} = Config.from_args(["--optimize-level", "ludicrous"])
       assert msg =~ "Unknown optimization level"
