@@ -446,21 +446,12 @@ defmodule Muex.WorkerPool do
     result =
       case Compiler.compile_to_source(mutation, file_entry, state.language_adapter) do
         {:ok, mutated_source} ->
-          cond do
-            tce_enabled and Tce.equivalent_source?(file_entry.ast, mutated_source) ->
-              # Provably equivalent: no test can ever kill it, so skip the
-              # (expensive) `mix test` subprocess entirely.
-              :equivalent
-
-            true ->
-              run_in_sandbox(
-                sandbox,
-                file_path,
-                mutated_source,
-                file_entry,
-                test_files,
-                timeout_ms
-              )
+          if tce_enabled and Tce.equivalent_source?(file_entry.ast, mutated_source) do
+            # Provably equivalent: no test can ever kill it, so skip the
+            # (expensive) `mix test` subprocess entirely.
+            :equivalent
+          else
+            run_in_sandbox(sandbox, file_path, mutated_source, file_entry, test_files, timeout_ms)
           end
 
         {:error, reason} ->

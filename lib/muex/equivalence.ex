@@ -48,23 +48,17 @@ defmodule Muex.Equivalence do
 
   defp ast_pattern_equivalent?(_mutation), do: false
 
-  # `a + 0` and `a - 0` both equal `a`; likewise the reverse. The identity
-  # operand must be the right-hand side (`0 - a` is `-a`, not `a`).
-  defp identity_pair?({op1, _, [left1, 0]}, {op2, _, [left2, 0]})
-       when op1 in [:+, :-] and op2 in [:+, :-] do
-    same_operand?(left1, left2)
-  end
+  # Operators that yield the original operand when applied with the identity
+  # element on the right. Swapping within a group is therefore equivalent:
+  #   `a + 0` <-> `a - 0`, `a * 1` <-> `a / 1`, `x <<< 0` <-> `x >>> 0`.
+  # The identity operand must be the *right* side (`0 - a` is `-a`, not `a`).
+  @identity_groups [{[:+, :-], 0}, {[:*, :/], 1}, {[:<<<, :>>>], 0}]
 
-  # `a * 1` and `a / 1` both equal `a` (right-hand identity only).
-  defp identity_pair?({op1, _, [left1, 1]}, {op2, _, [left2, 1]})
-       when op1 in [:*, :/] and op2 in [:*, :/] do
-    same_operand?(left1, left2)
-  end
+  defp identity_pair?({op1, _, [left1, n]}, {op2, _, [left2, n]}) do
+    same_group? =
+      Enum.any?(@identity_groups, fn {ops, id} -> n == id and op1 in ops and op2 in ops end)
 
-  # `x <<< 0` and `x >>> 0` both equal `x` (shifting by zero).
-  defp identity_pair?({op1, _, [left1, 0]}, {op2, _, [left2, 0]})
-       when op1 in [:<<<, :>>>] and op2 in [:<<<, :>>>] do
-    same_operand?(left1, left2)
+    same_group? and same_operand?(left1, left2)
   end
 
   defp identity_pair?(_original, _mutated), do: false

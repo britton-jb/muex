@@ -209,12 +209,15 @@ defmodule Muex do
     end
   end
 
-  defp build_result(results) do
+  @doc false
+  # Public only so the score math can be unit-tested directly.
+  def build_result(results) do
     killed = Enum.count(results, &(&1.result == :killed))
     survived = Enum.count(results, &(&1.result == :survived))
     timeout = Enum.count(results, &(&1.result == :timeout))
 
-    # Invalids are excluded: they tell us nothing about test quality.
+    # Invalids and equivalents are excluded: neither says anything about test
+    # quality (an equivalent mutant can never be killed).
     # Timeouts are ambiguous -- they could be killed or survived.
     denom = killed + survived + timeout
 

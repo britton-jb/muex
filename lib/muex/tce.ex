@@ -10,11 +10,11 @@ defmodule Muex.Tce do
   deleting a `@moduledoc`/`@doc` or any change that the compiler erases, where
   the resulting function bytecode is byte-for-byte identical.
 
-  The comparison is **sound**: each module is compiled and disassembled, line
-  annotations and the (throwaway) module name are stripped, and the remaining
-  instruction streams are compared. Equivalence is reported only on an exact
-  match; anything that fails to compile is treated as *not* provably equivalent
-  so a real mutant is never hidden.
+  The comparison is **sound**: both modules are compiled under the same
+  throwaway name, disassembled, their line annotations stripped, and the
+  remaining instruction streams compared. Equivalence is reported only on an
+  exact match; anything that fails to compile is treated as *not* provably
+  equivalent so a real mutant is never hidden.
   """
 
   @doc """
@@ -65,16 +65,13 @@ defmodule Muex.Tce do
     end
   end
 
-  # Compile under a unique throwaway module name, disassemble, and strip line
-  # annotations so only the behavioural instruction stream remains.
-  @probe_placeholder :__muex_tce_probe__
-
+  # Compile under a throwaway name, disassemble, and strip line annotations so
+  # only the behavioural instruction stream remains. The module name is shared
+  # by both sides of a comparison, so it needs no further normalisation.
   defp fingerprint(module_ast, probe) do
-    with {:ok, binary, module} <- compile_binary(module_ast, probe) do
+    with {:ok, binary} <- compile_binary(module_ast, probe) do
       {:beam_file, _module, _exports, _attrs, _compile_info, code} = :beam_disasm.file(binary)
-      # Strip line annotations and rewrite the throwaway module name to a
-      # constant, so two modules differing only in name/lines fingerprint alike.
-      {:ok, code |> strip_lines() |> normalize_module(module)}
+      {:ok, strip_lines(code)}
     end
   end
 
@@ -98,7 +95,7 @@ defmodule Muex.Tce do
     case Code.compile_quoted(renamed) do
       [{module, binary} | _] ->
         purge(module)
-        {:ok, binary, module}
+        {:ok, binary}
 
       _ ->
         :error
@@ -136,16 +133,4 @@ defmodule Muex.Tce do
   end
 
   defp strip_lines(other), do: other
-
-  defp normalize_module(term, module) when is_list(term) do
-    Enum.map(term, &normalize_module(&1, module))
-  end
-
-  defp normalize_module(module, module), do: @probe_placeholder
-
-  defp normalize_module(tuple, module) when is_tuple(tuple) do
-    tuple |> Tuple.to_list() |> normalize_module(module) |> List.to_tuple()
-  end
-
-  defp normalize_module(other, _module), do: other
 end

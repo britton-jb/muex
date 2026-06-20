@@ -5,4 +5,22 @@ defmodule MuexTest do
   test "module loads successfully" do
     assert Code.ensure_loaded?(Muex)
   end
+
+  describe "build_result/1 score" do
+    test "excludes :equivalent (and :invalid) mutants from the denominator" do
+      results = [
+        %{result: :killed},
+        %{result: :equivalent},
+        %{result: :invalid}
+      ]
+
+      # Only the 1 killed mutant is scorable: 1/1 = 100%, not 1/3.
+      assert {:ok, %{score_low: 100.0, score_high: 100.0}} = Muex.build_result(results)
+    end
+
+    test "is 0.0 when there are no scorable mutants" do
+      assert {:ok, %{score_low: 0.0, score_high: 0.0}} =
+               Muex.build_result([%{result: :equivalent}, %{result: :invalid}])
+    end
+  end
 end
