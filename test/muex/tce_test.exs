@@ -116,6 +116,17 @@ defmodule Muex.TceTest do
     end
   end
 
+  describe "equivalent?/2 — module-name changes are observable" do
+    test "two modules with identical bodies but different names are NOT equivalent" do
+      a = quoted("defmodule Foo do def f, do: 1 end")
+      b = quoted("defmodule Bar do def f, do: 1 end")
+
+      # Renaming a module is killable (callers can no longer find it), so even
+      # byte-identical function bodies must not be reported equivalent.
+      refute Tce.equivalent?(a, b)
+    end
+  end
+
   describe "equivalent?/2 — safety" do
     test "is false (not provably equivalent) when one side fails to compile" do
       a = quoted("defmodule M do def f, do: 1 end")

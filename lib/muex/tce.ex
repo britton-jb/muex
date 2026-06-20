@@ -24,17 +24,34 @@ defmodule Muex.Tce do
   """
   @spec equivalent?(Macro.t(), Macro.t()) :: boolean()
   def equivalent?(module_ast_a, module_ast_b) do
-    # Both sides MUST compile under the *same* throwaway module name: BEAM
-    # derives a closure's identity hash from the module name, so different
-    # names would make even identical code fingerprint differently. The name is
-    # still unique per call, so concurrent comparisons don't collide.
-    probe = probe_alias()
+    # A mutation that changes the module's *name* is observable (callers can no
+    # longer find it), so it must never be called equivalent. Because we
+    # compile both sides under a shared throwaway name to compare bytecode, that
+    # rename would otherwise mask a name change — so guard against it up front.
+    if same_module_name?(module_ast_a, module_ast_b) do
+      # Both sides MUST compile under the *same* throwaway name: BEAM derives a
+      # closure's identity hash from the module name, so different names would
+      # make even identical code fingerprint differently. The name is unique
+      # per call, so concurrent comparisons don't collide.
+      probe = probe_alias()
 
-    case {fingerprint(module_ast_a, probe), fingerprint(module_ast_b, probe)} do
-      {{:ok, a}, {:ok, b}} -> a == b
-      _ -> false
+      case {fingerprint(module_ast_a, probe), fingerprint(module_ast_b, probe)} do
+        {{:ok, a}, {:ok, b}} -> a == b
+        _ -> false
+      end
+    else
+      false
     end
   end
+
+  defp same_module_name?({:defmodule, _, [alias_a, _]}, {:defmodule, _, [alias_b, _]}) do
+    alias_segments(alias_a) == alias_segments(alias_b)
+  end
+
+  defp same_module_name?(_a, _b), do: false
+
+  defp alias_segments({:__aliases__, _meta, segments}), do: segments
+  defp alias_segments(other), do: other
 
   @doc """
   Like `equivalent?/2`, but the mutant is supplied as source text (as produced
