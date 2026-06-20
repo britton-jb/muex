@@ -25,7 +25,8 @@ defmodule Muex.ConfigTest do
       assert Muex.Mutator.StatementDeletion in config.mutators
       assert Muex.Mutator.ReturnValue in config.mutators
       assert Muex.Mutator.InvertNegatives in config.mutators
-      assert length(config.mutators) == 9
+      assert Muex.Mutator.NegateConditionals in config.mutators
+      assert length(config.mutators) == 10
     end
 
     test "parses --files flag" do
