@@ -199,7 +199,8 @@ defmodule Muex do
         timeout_ms: config.timeout_ms,
         verbose: config.verbose,
         test_paths: abs_test_paths,
-        project_root: config.project_root
+        project_root: config.project_root,
+        tce: config.tce
       )
 
     case output_report(results, config.format, config.verbose) do

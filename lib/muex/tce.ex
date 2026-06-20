@@ -30,6 +30,18 @@ defmodule Muex.Tce do
     end
   end
 
+  @doc """
+  Like `equivalent?/2`, but the mutant is supplied as source text (as produced
+  by the compiler when applying a mutation). Returns false if it does not parse.
+  """
+  @spec equivalent_source?(Macro.t(), String.t()) :: boolean()
+  def equivalent_source?(original_module_ast, mutated_source) when is_binary(mutated_source) do
+    case Code.string_to_quoted(mutated_source) do
+      {:ok, mutant_ast} -> equivalent?(original_module_ast, mutant_ast)
+      _ -> false
+    end
+  end
+
   # Compile under a unique throwaway module name, disassemble, and strip line
   # annotations so only the behavioural instruction stream remains.
   @probe_placeholder :__muex_tce_probe__
@@ -44,29 +56,34 @@ defmodule Muex.Tce do
   end
 
   defp compile_binary(module_ast) do
-    renamed = rename_module(module_ast, probe_alias())
+    # Only a single top-level `defmodule` can be safely renamed to a throwaway
+    # name. Anything else (multiple modules, bare expressions) is refused so we
+    # never compile and clobber the project's real modules mid-run.
+    case rename_module(module_ast) do
+      {:ok, renamed} ->
+        # with_diagnostics captures compiler warnings/errors instead of printing
+        # them, keeping mutant compile failures off the console.
+        {result, _diagnostics} = Code.with_diagnostics(fn -> compile_renamed(renamed) end)
+        result
 
-    # with_diagnostics captures compiler warnings/errors instead of printing
-    # them, keeping mutant compile failures off the console.
-    {result, _diagnostics} =
-      Code.with_diagnostics(fn ->
-        try do
-          case Code.compile_quoted(renamed) do
-            [{module, binary} | _] ->
-              purge(module)
-              {:ok, binary, module}
+      :error ->
+        :error
+    end
+  end
 
-            _ ->
-              :error
-          end
-        rescue
-          _ -> :error
-        catch
-          _, _ -> :error
-        end
-      end)
+  defp compile_renamed(renamed) do
+    case Code.compile_quoted(renamed) do
+      [{module, binary} | _] ->
+        purge(module)
+        {:ok, binary, module}
 
-    result
+      _ ->
+        :error
+    end
+  rescue
+    _ -> :error
+  catch
+    _, _ -> :error
   end
 
   defp probe_alias do
@@ -74,11 +91,11 @@ defmodule Muex.Tce do
     {:__aliases__, [], [segment]}
   end
 
-  defp rename_module({:defmodule, meta, [_alias, body]}, probe_alias) do
-    {:defmodule, meta, [probe_alias, body]}
+  defp rename_module({:defmodule, meta, [_alias, body]}) do
+    {:ok, {:defmodule, meta, [probe_alias(), body]}}
   end
 
-  defp rename_module(other, _probe_alias), do: other
+  defp rename_module(_other), do: :error
 
   defp purge(module) do
     :code.purge(module)

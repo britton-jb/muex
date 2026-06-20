@@ -18,7 +18,7 @@ defmodule Muex.WorkerPool do
   use GenServer
   require Logger
 
-  alias Muex.{Compiler, Config, DependencyAnalyzer, Reporter, Sandbox}
+  alias Muex.{Compiler, Config, DependencyAnalyzer, Reporter, Sandbox, Tce}
   alias Muex.TestRunner.Port, as: PortRunner
 
   @default_max_workers 4
@@ -441,28 +441,26 @@ defmodule Muex.WorkerPool do
     # resolve correctly when `mix test` runs inside the sandbox.
     test_files = relativize_paths(test_files, state.project_root)
 
+    tce_enabled = Keyword.get(state.opts, :tce, true)
+
     result =
       case Compiler.compile_to_source(mutation, file_entry, state.language_adapter) do
         {:ok, mutated_source} ->
-          # Apply the mutation to the sandbox (not the real project)
-          case Sandbox.apply_mutation(sandbox, file_path, mutated_source, file_entry.module_name) do
-            {:ok, _precompiled} ->
-              # Wrap in try/after so the sandbox is always restored,
-              # even if PortRunner.run_tests raises an exception.
-              try do
-                test_result =
-                  PortRunner.run_tests(test_files,
-                    timeout_ms: timeout_ms,
-                    cd: sandbox.root
-                  )
+          cond do
+            tce_enabled and Tce.equivalent_source?(file_entry.ast, mutated_source) ->
+              # Provably equivalent: no test can ever kill it, so skip the
+              # (expensive) `mix test` subprocess entirely.
+              :equivalent
 
-                classify_test_result(test_result)
-              after
-                Sandbox.restore(sandbox, file_path)
-              end
-
-            {:error, reason} ->
-              {:invalid, reason}
+            true ->
+              run_in_sandbox(
+                sandbox,
+                file_path,
+                mutated_source,
+                file_entry,
+                test_files,
+                timeout_ms
+              )
           end
 
         {:error, reason} ->
@@ -482,6 +480,24 @@ defmodule Muex.WorkerPool do
     e -> %{mutation: mutation, result: :timeout, duration_ms: 0, error: e}
   catch
     :exit, reason -> %{mutation: mutation, result: :timeout, duration_ms: 0, error: reason}
+  end
+
+  defp run_in_sandbox(sandbox, file_path, mutated_source, file_entry, test_files, timeout_ms) do
+    case Sandbox.apply_mutation(sandbox, file_path, mutated_source, file_entry.module_name) do
+      {:ok, _precompiled} ->
+        # Wrap in try/after so the sandbox is always restored, even if
+        # PortRunner.run_tests raises an exception.
+        try do
+          test_files
+          |> PortRunner.run_tests(timeout_ms: timeout_ms, cd: sandbox.root)
+          |> classify_test_result()
+        after
+          Sandbox.restore(sandbox, file_path)
+        end
+
+      {:error, reason} ->
+        {:invalid, reason}
+    end
   end
 
   defp classify_test_result({:ok, %{failures: 0}}), do: :survived
