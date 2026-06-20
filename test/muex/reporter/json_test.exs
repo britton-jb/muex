@@ -148,6 +148,25 @@ defmodule Muex.Reporter.JsonTest do
     end
   end
 
+  describe "to_json/1 — equivalent mutants" do
+    test "counts equivalents and excludes them from the score denominator" do
+      results = [
+        %{result: :killed, mutation: test_mutation("lib/a.ex", 1), duration_ms: 10, error: nil},
+        %{result: :equivalent, mutation: test_mutation("lib/b.ex", 2), duration_ms: 5, error: nil}
+      ]
+
+      report = Jason.decode!(Json.to_json(results))
+      summary = report["summary"]
+
+      assert summary["total"] == 2
+      assert summary["killed"] == 1
+      assert summary["equivalent"] == 1
+      # 1 killed of 1 scorable mutant: the equivalent is not in the denominator.
+      assert summary["mutation_score_low"] == 100.0
+      assert summary["mutation_score_high"] == 100.0
+    end
+  end
+
   defp test_mutation(file, line) do
     %{
       mutator: Muex.Mutator.Arithmetic,

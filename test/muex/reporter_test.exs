@@ -21,6 +21,20 @@ defmodule Muex.ReporterTest do
       assert output =~ "Mutation Score: \e[33m66.67%\e[0m"
     end
 
+    test "reports equivalent mutants and excludes them from the score" do
+      results = [
+        %{result: :killed, mutation: test_mutation()},
+        %{result: :equivalent, mutation: test_mutation()}
+      ]
+
+      output = capture_io(fn -> Reporter.print_summary(results) end)
+
+      assert output =~ "Total mutants:\e[0m 2"
+      assert output =~ "Equivalent:"
+      # The equivalent mutant is excluded from the denominator: 1 killed of 1.
+      assert output =~ "Mutation Score: \e[32m100.0%\e[0m"
+    end
+
     test "handles all killed mutations" do
       results = [
         %{result: :killed, mutation: test_mutation()},

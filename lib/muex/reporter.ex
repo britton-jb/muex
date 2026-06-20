@@ -29,8 +29,10 @@ defmodule Muex.Reporter do
     survived = Enum.count(results, &(&1.result == :survived))
     invalid = Enum.count(results, &(&1.result == :invalid))
     timeout = Enum.count(results, &(&1.result == :timeout))
+    equivalent = Enum.count(results, &(&1.result == :equivalent))
 
-    # Invalids are excluded: they say nothing about test quality.
+    # Invalids and equivalents are excluded: a provably-equivalent mutant can
+    # never be killed, so it says nothing about test quality.
     # Timeouts are ambiguous -- could be killed or survived.
     denom = killed + survived + timeout
 
@@ -51,6 +53,11 @@ defmodule Muex.Reporter do
     IO.puts("#{@red}Survived:#{@reset} #{survived} #{@gray}(not caught by tests)#{@reset}")
     IO.puts("#{@yellow}Invalid:#{@reset} #{invalid} #{@gray}(compilation errors)#{@reset}")
     IO.puts("#{@magenta}Timeout:#{@reset} #{timeout}")
+
+    IO.puts(
+      "#{@gray}Equivalent:#{@reset} #{equivalent} #{@gray}(provably unkillable, skipped)#{@reset}"
+    )
+
     IO.puts("#{@gray}#{String.duplicate("=", 50)}#{@reset}")
 
     score_color =
@@ -94,6 +101,7 @@ defmodule Muex.Reporter do
         :survived -> {"×", @red}
         :invalid -> {"-", @yellow}
         :timeout -> {"?", @magenta}
+        :equivalent -> {"≡", @gray}
       end
 
     IO.write("#{color}#{symbol}#{@reset}")
