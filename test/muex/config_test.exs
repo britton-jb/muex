@@ -117,6 +117,16 @@ defmodule Muex.ConfigTest do
       assert config.since == "main"
     end
 
+    test "coverage_guided defaults to false" do
+      assert {:ok, config} = Config.from_args([])
+      assert config.coverage_guided == false
+    end
+
+    test "parses --coverage-guided" do
+      assert {:ok, config} = Config.from_args(["--coverage-guided"])
+      assert config.coverage_guided == true
+    end
+
     test "returns error for invalid optimize level" do
       assert {:error, msg} = Config.from_args(["--optimize-level", "ludicrous"])
       assert msg =~ "Unknown optimization level"

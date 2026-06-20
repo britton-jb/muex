@@ -27,6 +27,9 @@ defmodule Mix.Tasks.Muex do
     * `--no-tce` - Disable Trivial Compiler Equivalence skipping (default: enabled)
     * `--since` - Only mutate lines changed since a git ref (e.g. `--since main`),
       i.e. the lines added/modified on this branch. Ideal for PR/CI runs.
+    * `--coverage-guided` - Run each mutant only against the tests that cover its
+      line, and skip mutants on uncovered lines. Collects per-test coverage up
+      front (one run per test file), so it trades startup cost for faster runs.
 
   ## Score precision and CI gates
 
