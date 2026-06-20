@@ -84,6 +84,38 @@ defmodule Muex.TceTest do
     end
   end
 
+  describe "equivalent?/2 — modules with closures (regression)" do
+    # BEAM derives a closure's identity hash from the module name; comparing two
+    # compiles under *different* throwaway names made even identical code with a
+    # function capture fingerprint differently. Both sides must share one name.
+    test "a module containing a function capture is equivalent to itself" do
+      m =
+        quoted(~S|defmodule M do
+          def f(xs), do: Enum.map(xs, &g/1)
+          def g(x), do: x + 1
+        end|)
+
+      assert Tce.equivalent?(m, m)
+    end
+
+    test "deleting a @moduledoc is equivalent even when the module uses a capture" do
+      a =
+        quoted(~S|defmodule M do
+          @moduledoc "docs"
+          def f(xs), do: Enum.map(xs, &g/1)
+          def g(x), do: x + 1
+        end|)
+
+      b =
+        quoted(~S|defmodule M do
+          def f(xs), do: Enum.map(xs, &g/1)
+          def g(x), do: x + 1
+        end|)
+
+      assert Tce.equivalent?(a, b)
+    end
+  end
+
   describe "equivalent?/2 — safety" do
     test "is false (not provably equivalent) when one side fails to compile" do
       a = quoted("defmodule M do def f, do: 1 end")

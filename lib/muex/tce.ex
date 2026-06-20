@@ -24,7 +24,13 @@ defmodule Muex.Tce do
   """
   @spec equivalent?(Macro.t(), Macro.t()) :: boolean()
   def equivalent?(module_ast_a, module_ast_b) do
-    case {fingerprint(module_ast_a), fingerprint(module_ast_b)} do
+    # Both sides MUST compile under the *same* throwaway module name: BEAM
+    # derives a closure's identity hash from the module name, so different
+    # names would make even identical code fingerprint differently. The name is
+    # still unique per call, so concurrent comparisons don't collide.
+    probe = probe_alias()
+
+    case {fingerprint(module_ast_a, probe), fingerprint(module_ast_b, probe)} do
       {{:ok, a}, {:ok, b}} -> a == b
       _ -> false
     end
@@ -46,8 +52,8 @@ defmodule Muex.Tce do
   # annotations so only the behavioural instruction stream remains.
   @probe_placeholder :__muex_tce_probe__
 
-  defp fingerprint(module_ast) do
-    with {:ok, binary, module} <- compile_binary(module_ast) do
+  defp fingerprint(module_ast, probe) do
+    with {:ok, binary, module} <- compile_binary(module_ast, probe) do
       {:beam_file, _module, _exports, _attrs, _compile_info, code} = :beam_disasm.file(binary)
       # Strip line annotations and rewrite the throwaway module name to a
       # constant, so two modules differing only in name/lines fingerprint alike.
@@ -55,11 +61,11 @@ defmodule Muex.Tce do
     end
   end
 
-  defp compile_binary(module_ast) do
+  defp compile_binary(module_ast, probe) do
     # Only a single top-level `defmodule` can be safely renamed to a throwaway
     # name. Anything else (multiple modules, bare expressions) is refused so we
     # never compile and clobber the project's real modules mid-run.
-    case rename_module(module_ast) do
+    case rename_module(module_ast, probe) do
       {:ok, renamed} ->
         # with_diagnostics captures compiler warnings/errors instead of printing
         # them, keeping mutant compile failures off the console.
@@ -91,11 +97,11 @@ defmodule Muex.Tce do
     {:__aliases__, [], [segment]}
   end
 
-  defp rename_module({:defmodule, meta, [_alias, body]}) do
-    {:ok, {:defmodule, meta, [probe_alias(), body]}}
+  defp rename_module({:defmodule, meta, [_alias, body]}, probe) do
+    {:ok, {:defmodule, meta, [probe, body]}}
   end
 
-  defp rename_module(_other), do: :error
+  defp rename_module(_other, _probe), do: :error
 
   defp purge(module) do
     :code.purge(module)
