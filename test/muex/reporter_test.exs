@@ -35,6 +35,20 @@ defmodule Muex.ReporterTest do
       assert output =~ "Mutation Score: \e[32m100.0%\e[0m"
     end
 
+    test "reports no-coverage mutants and excludes them from the score" do
+      results = [
+        %{result: :killed, mutation: test_mutation()},
+        %{result: :no_coverage, mutation: test_mutation()}
+      ]
+
+      output = capture_io(fn -> Reporter.print_summary(results) end)
+
+      assert output =~ "Total mutants:\e[0m 2"
+      assert output =~ "No coverage:"
+      # A no-coverage mutant is excluded from the denominator: 1 killed of 1.
+      assert output =~ "Mutation Score: \e[32m100.0%\e[0m"
+    end
+
     test "handles all killed mutations" do
       results = [
         %{result: :killed, mutation: test_mutation()},

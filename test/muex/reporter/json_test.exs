@@ -165,6 +165,25 @@ defmodule Muex.Reporter.JsonTest do
       assert summary["mutation_score_low"] == 100.0
       assert summary["mutation_score_high"] == 100.0
     end
+
+    test "counts no-coverage mutants and excludes them from the score" do
+      results = [
+        %{result: :killed, mutation: test_mutation("lib/a.ex", 1), duration_ms: 10, error: nil},
+        %{
+          result: :no_coverage,
+          mutation: test_mutation("lib/b.ex", 2),
+          duration_ms: 0,
+          error: nil
+        }
+      ]
+
+      summary = Jason.decode!(Json.to_json(results))["summary"]
+
+      assert summary["total"] == 2
+      assert summary["killed"] == 1
+      assert summary["no_coverage"] == 1
+      assert summary["mutation_score_low"] == 100.0
+    end
   end
 
   defp test_mutation(file, line) do
