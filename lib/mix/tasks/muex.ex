@@ -24,6 +24,19 @@ defmodule Mix.Tasks.Muex do
     * `--verbose` - Show detailed progress information (file analysis, optimization, etc.)
     * `--optimize` - Enable mutation optimization heuristics (default: enabled)
     * `--no-optimize` - Disable mutation optimization heuristics
+
+  ## Score precision and CI gates
+
+  Provably-equivalent mutants (which no test can ever kill) are always dropped,
+  regardless of optimization, so they never distort the score.
+
+  `--optimize` additionally *samples* the remaining mutants (clustering and
+  per-function caps) to run faster. This makes the reported score an
+  **estimate** — the same code can report different scores at different
+  optimization levels. That is fine for a quick local check, but for a hard
+  `--fail-at` gate in CI you want the exact score, so run with `--no-optimize`:
+
+      mix muex --no-optimize --fail-at 80   # exact score, suitable for a CI gate
     * `--optimize-level` - Optimization preset: conservative, balanced, aggressive (default: balanced)
     * `--min-complexity` - Minimum complexity for mutations (default: 2, with --optimize)
     * `--max-per-function` - Max mutations per function (default: 20, with --optimize)
