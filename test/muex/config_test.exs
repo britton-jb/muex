@@ -29,7 +29,8 @@ defmodule Muex.ConfigTest do
       assert Muex.Mutator.EnumSemantics in config.mutators
       assert Muex.Mutator.Pipe in config.mutators
       assert Muex.Mutator.Guard in config.mutators
-      assert length(config.mutators) == 13
+      assert Muex.Mutator.CaseClause in config.mutators
+      assert length(config.mutators) == 14
     end
 
     test "parses --files flag" do
