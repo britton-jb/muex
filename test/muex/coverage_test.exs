@@ -42,4 +42,26 @@ defmodule Muex.CoverageTest do
   test "new/0 is empty" do
     assert Coverage.tests_for(Coverage.new(), "lib/a.ex", 1) == :no_coverage
   end
+
+  describe "covered_lines/1" do
+    test "keeps only the lines a `:cover` line analysis recorded as executed" do
+      analysis = [{{SomeMod, 10}, 3}, {{SomeMod, 11}, 0}, {{SomeMod, 12}, 1}]
+      assert Coverage.covered_lines(analysis) == [10, 12]
+    end
+
+    test "is empty when nothing ran" do
+      assert Coverage.covered_lines([{{SomeMod, 5}, 0}]) == []
+      assert Coverage.covered_lines([]) == []
+    end
+  end
+
+  describe "put_lines/4" do
+    test "records many lines for one (file, test) at once" do
+      index = Coverage.put_lines(Coverage.new(), "lib/a.ex", [10, 12], "test/a_test.exs")
+
+      assert Coverage.tests_for(index, "lib/a.ex", 10) == {:covered, ["test/a_test.exs"]}
+      assert Coverage.tests_for(index, "lib/a.ex", 12) == {:covered, ["test/a_test.exs"]}
+      assert Coverage.tests_for(index, "lib/a.ex", 11) == :no_coverage
+    end
+  end
 end
