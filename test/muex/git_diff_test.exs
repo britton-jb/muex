@@ -1,0 +1,108 @@
+defmodule Muex.GitDiffTest do
+  use ExUnit.Case, async: true
+
+  alias Muex.GitDiff
+
+  describe "changed_lines/1" do
+    test "captures added/modified lines from a single hunk (new-file side)" do
+      diff = """
+      diff --git a/lib/foo.ex b/lib/foo.ex
+      index 1111111..2222222 100644
+      --- a/lib/foo.ex
+      +++ b/lib/foo.ex
+      @@ -10,1 +10,3 @@ def foo do
+      +  a
+      +  b
+      +  c
+      """
+
+      assert GitDiff.changed_lines(diff) == %{"lib/foo.ex" => MapSet.new([10, 11, 12])}
+    end
+
+    test "merges multiple hunks within one file" do
+      diff = """
+      --- a/lib/foo.ex
+      +++ b/lib/foo.ex
+      @@ -1,0 +2,1 @@
+      +x
+      @@ -20,0 +40,2 @@
+      +y
+      +z
+      """
+
+      assert GitDiff.changed_lines(diff) == %{"lib/foo.ex" => MapSet.new([2, 40, 41])}
+    end
+
+    test "handles multiple files" do
+      diff = """
+      --- a/lib/a.ex
+      +++ b/lib/a.ex
+      @@ -1,0 +1,1 @@
+      +a
+      --- a/lib/b.ex
+      +++ b/lib/b.ex
+      @@ -5,0 +5,1 @@
+      +b
+      """
+
+      assert GitDiff.changed_lines(diff) ==
+               %{"lib/a.ex" => MapSet.new([1]), "lib/b.ex" => MapSet.new([5])}
+    end
+
+    test "treats an omitted hunk count as 1" do
+      diff = """
+      --- a/lib/foo.ex
+      +++ b/lib/foo.ex
+      @@ -3 +7 @@
+      +line
+      """
+
+      assert GitDiff.changed_lines(diff) == %{"lib/foo.ex" => MapSet.new([7])}
+    end
+
+    test "captures every line of a newly added file" do
+      diff = """
+      diff --git a/lib/new.ex b/lib/new.ex
+      new file mode 100644
+      --- /dev/null
+      +++ b/lib/new.ex
+      @@ -0,0 +1,3 @@
+      +one
+      +two
+      +three
+      """
+
+      assert GitDiff.changed_lines(diff) == %{"lib/new.ex" => MapSet.new([1, 2, 3])}
+    end
+
+    test "ignores deleted files (no new-file side)" do
+      diff = """
+      diff --git a/lib/gone.ex b/lib/gone.ex
+      deleted file mode 100644
+      --- a/lib/gone.ex
+      +++ /dev/null
+      @@ -1,2 +0,0 @@
+      -old
+      -code
+      """
+
+      assert GitDiff.changed_lines(diff) == %{}
+    end
+
+    test "ignores a pure-deletion hunk (zero added lines)" do
+      diff = """
+      --- a/lib/foo.ex
+      +++ b/lib/foo.ex
+      @@ -10,2 +9,0 @@
+      -removed
+      -removed2
+      """
+
+      assert GitDiff.changed_lines(diff) == %{}
+    end
+
+    test "returns an empty map for empty input" do
+      assert GitDiff.changed_lines("") == %{}
+    end
+  end
+end
