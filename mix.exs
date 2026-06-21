@@ -95,10 +95,12 @@ defmodule Muex.MixProject do
 
   defp description do
     """
-    Language-agnostic mutation testing library for Elixir, Erlang, and other BEAM languages.
-    Evaluates test suite quality by introducing deliberate bugs into code and verifying that tests
-    catch them. Intelligent file filtering, 6 mutation strategies, parallel execution,
-    multiple output formats.
+    Language-agnostic mutation testing for Elixir, Erlang, and other BEAM languages.
+    Evaluates test suite quality by mutating code and checking whether tests catch it.
+    18 mutators (incl. Elixir-specific: pipes, guards, case/cond/with, Enum/Map), sound
+    equivalent-mutant handling (AST rules + trivial compiler equivalence), line-precise
+    --since scoping for pull requests, coverage-guided execution, parallel runs, and
+    JSON/HTML reports.
     """
   end
 
