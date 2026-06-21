@@ -130,6 +130,32 @@ defmodule Muex.TestRunner.PortTest do
         File.rm_rf!(tmp_dir)
       end
     end
+
+    test "a file with multiple failures still reports failures (short-circuit kills)" do
+      tmp_dir =
+        Path.join(System.tmp_dir!(), "muex_port_test_#{System.unique_integer([:positive])}")
+
+      File.mkdir_p!(tmp_dir)
+      bad_test = Path.join(tmp_dir, "multi_fail_test.exs")
+      mod_name = "MuexMultiFail#{System.unique_integer([:positive])}"
+
+      File.write!(bad_test, """
+      defmodule #{mod_name} do
+        use ExUnit.Case
+        test "fail one", do: assert 1 == 2
+        test "fail two", do: assert 3 == 4
+      end
+      """)
+
+      try do
+        # `mix test --max-failures 1` stops at the first failure, but a killed
+        # mutant only needs failures > 0 — classification must still be a kill.
+        assert {:ok, %{failures: failures}} = PortRunner.run_tests([bad_test], timeout_ms: 15_000)
+        assert failures > 0
+      after
+        File.rm_rf!(tmp_dir)
+      end
+    end
   end
 
   describe "compile error regex" do
