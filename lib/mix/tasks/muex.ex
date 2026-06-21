@@ -78,18 +78,39 @@ defmodule Mix.Tasks.Muex do
           {:error, reason} ->
             Mix.raise(reason)
 
-          {:ok, %{score_low: score_low, score_high: score_high}} ->
-            # Use the pessimistic (low) bound for threshold comparison.
-            # If even the best-case interpretation fails, the score is too low.
-            if score_low < config.fail_at do
-              score_str =
-                if score_low == score_high,
-                  do: "#{score_low}%",
-                  else: "#{score_low}%..#{score_high}%"
+          {:ok, result} ->
+            case gate(result, config.fail_at) do
+              :no_mutations ->
+                Mix.shell().info("No mutations to test — nothing to score.")
 
-              Mix.raise("Mutation score #{score_str} is below threshold #{config.fail_at}%")
+              :pass ->
+                :ok
+
+              {:below_threshold, score_str} ->
+                Mix.raise("Mutation score #{score_str} is below threshold #{config.fail_at}%")
             end
         end
+    end
+  end
+
+  @doc false
+  # Decides the outcome of a run against the fail-at threshold. A run with no
+  # mutations (e.g. `--since` with no relevant changes) is a no-op pass, not a
+  # failure. Uses the pessimistic (low) bound: if even the best-case
+  # interpretation falls short, the score is too low.
+  @spec gate(map(), number()) :: :no_mutations | :pass | {:below_threshold, String.t()}
+  def gate(%{results: []}, _fail_at), do: :no_mutations
+
+  def gate(%{score_low: score_low, score_high: score_high}, fail_at) do
+    if score_low < fail_at do
+      score_str =
+        if score_low == score_high,
+          do: "#{score_low}%",
+          else: "#{score_low}%..#{score_high}%"
+
+      {:below_threshold, score_str}
+    else
+      :pass
     end
   end
 end
