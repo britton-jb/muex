@@ -24,17 +24,32 @@ defmodule Muex.Coverage do
     end)
   end
 
-  @doc """
-  Returns the test files covering `file:line`.
+  @doc "Records that `line` of `file` is executable (even if no test runs it)."
+  @spec put_executable(t(), Path.t(), pos_integer()) :: t()
+  def put_executable(index, file, line) do
+    Map.update(index, file, %{line => MapSet.new()}, &Map.put_new(&1, line, MapSet.new()))
+  end
 
-  `{:covered, sorted_test_files}` when at least one test executes the line,
-  `:no_coverage` otherwise.
+  @doc """
+  Returns the coverage status of `file:line`:
+
+    * `{:covered, sorted_test_files}` — at least one test executes the line;
+    * `:no_coverage` — the line is executable but no test runs it;
+    * `:unknown` — there is no coverage data for the line (e.g. it is not an
+      executable line, like a `defmodule`/`def` header), so coverage can't
+      decide and the caller should run the mutant normally.
   """
-  @spec tests_for(t(), Path.t(), pos_integer()) :: {:covered, [Path.t()]} | :no_coverage
+  @spec tests_for(t(), Path.t(), pos_integer()) ::
+          {:covered, [Path.t()]} | :no_coverage | :unknown
   def tests_for(index, file, line) do
     case get_in(index, [file, line]) do
-      nil -> :no_coverage
-      set -> {:covered, set |> MapSet.to_list() |> Enum.sort()}
+      nil ->
+        :unknown
+
+      set ->
+        if MapSet.size(set) == 0,
+          do: :no_coverage,
+          else: {:covered, set |> MapSet.to_list() |> Enum.sort()}
     end
   end
 
@@ -46,7 +61,7 @@ defmodule Muex.Coverage do
 
   @doc "Whether any test covers `file:line`."
   @spec covered?(t(), Path.t(), pos_integer()) :: boolean()
-  def covered?(index, file, line), do: tests_for(index, file, line) != :no_coverage
+  def covered?(index, file, line), do: match?({:covered, _}, tests_for(index, file, line))
 
   @doc """
   Extracts the executed line numbers from a `:cover.analyse(_, :calls, :line)`
@@ -118,8 +133,22 @@ defmodule Muex.Coverage do
 
     Enum.reduce(module_to_path, index, fn {module, path}, idx ->
       case :cover.analyse(module, :calls, :line) do
-        {:ok, line_analysis} -> put_lines(idx, path, covered_lines(line_analysis), test_file)
+        {:ok, line_analysis} -> merge_module(idx, path, line_analysis, test_file)
         _ -> idx
+      end
+    end)
+  end
+
+  # Register every executable line of the module (so an uncovered line reads as
+  # :no_coverage, not :unknown), and attribute the lines this test executed.
+  # `:cover` sometimes reports line 0 for module-level entries; those are not
+  # real lines, so they are skipped (and read back as :unknown).
+  defp merge_module(index, path, line_analysis, test_file) do
+    Enum.reduce(line_analysis, index, fn {{_module, line}, calls}, idx ->
+      cond do
+        line < 1 -> idx
+        calls > 0 -> put(put_executable(idx, path, line), path, line, test_file)
+        true -> put_executable(idx, path, line)
       end
     end)
   end

@@ -21,9 +21,21 @@ defmodule Muex.CoverageTest do
       assert Coverage.tests_for(index, "lib/a.ex", 11) == {:covered, ["test/a_test.exs"]}
     end
 
-    test "tests_for returns :no_coverage for a line no test executes", %{index: index} do
-      assert Coverage.tests_for(index, "lib/a.ex", 99) == :no_coverage
-      assert Coverage.tests_for(index, "lib/other.ex", 10) == :no_coverage
+    test "tests_for returns :unknown for a line with no coverage data", %{index: index} do
+      assert Coverage.tests_for(index, "lib/a.ex", 99) == :unknown
+      assert Coverage.tests_for(index, "lib/other.ex", 10) == :unknown
+    end
+
+    test "tests_for returns :no_coverage for an executable line no test runs", %{index: index} do
+      index = Coverage.put_executable(index, "lib/a.ex", 50)
+      assert Coverage.tests_for(index, "lib/a.ex", 50) == :no_coverage
+    end
+
+    test "put_executable does not downgrade an already-covered line", %{index: index} do
+      index = Coverage.put_executable(index, "lib/a.ex", 10)
+
+      assert Coverage.tests_for(index, "lib/a.ex", 10) ==
+               {:covered, ["test/a_test.exs", "test/b_test.exs"]}
     end
 
     test "put is idempotent for the same (file, line, test)", %{index: index} do
@@ -40,7 +52,7 @@ defmodule Muex.CoverageTest do
   end
 
   test "new/0 is empty" do
-    assert Coverage.tests_for(Coverage.new(), "lib/a.ex", 1) == :no_coverage
+    assert Coverage.tests_for(Coverage.new(), "lib/a.ex", 1) == :unknown
   end
 
   describe "covered_lines/1" do
@@ -61,7 +73,7 @@ defmodule Muex.CoverageTest do
 
       assert Coverage.tests_for(index, "lib/a.ex", 10) == {:covered, ["test/a_test.exs"]}
       assert Coverage.tests_for(index, "lib/a.ex", 12) == {:covered, ["test/a_test.exs"]}
-      assert Coverage.tests_for(index, "lib/a.ex", 11) == :no_coverage
+      assert Coverage.tests_for(index, "lib/a.ex", 11) == :unknown
     end
   end
 end

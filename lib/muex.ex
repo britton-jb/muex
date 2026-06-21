@@ -168,6 +168,22 @@ defmodule Muex do
     included
   end
 
+  # With coverage guidance, build the line->tests index up front by running each
+  # test file under coverage. Returns nil when disabled (the worker then falls
+  # back to module-level dependency analysis).
+  defp maybe_collect_coverage(%Muex.Config{coverage_guided: false}, _test_paths, _file_to_module),
+    do: nil
+
+  defp maybe_collect_coverage(
+         %Muex.Config{coverage_guided: true} = config,
+         test_paths,
+         file_to_module
+       ) do
+    test_files = Muex.Config.expand_test_paths(test_paths)
+    log("Collecting coverage from #{length(test_files)} test file(s)...", config.verbose)
+    Muex.Coverage.collect(test_files, file_to_module, cd: config.project_root)
+  end
+
   # Always-on, sound: equivalent mutants can never be killed, so dropping them
   # is a correctness step independent of the (lossy) --optimize sampling.
   defp drop_equivalent(mutations, %Muex.Config{verbose: verbose}) do
@@ -214,6 +230,8 @@ defmodule Muex do
     file_entries = Map.new(files, fn file -> {file.path, file} end)
     file_to_module = Map.new(files, fn file -> {file.path, file.module_name} end)
 
+    coverage_index = maybe_collect_coverage(config, abs_test_paths, file_to_module)
+
     log(
       "Running tests...
 ",
@@ -232,7 +250,8 @@ defmodule Muex do
         verbose: config.verbose,
         test_paths: abs_test_paths,
         project_root: config.project_root,
-        tce: config.tce
+        tce: config.tce,
+        coverage_index: coverage_index
       )
 
     case output_report(results, config.format, config.verbose) do
