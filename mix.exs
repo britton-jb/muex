@@ -2,7 +2,7 @@ defmodule Muex.MixProject do
   use Mix.Project
 
   @app :muex
-  @version "0.6.4"
+  @version "0.6.5"
   @source_url "https://github.com/Oeditus/muex"
 
   def project do
@@ -71,8 +71,11 @@ defmodule Muex.MixProject do
       # Core dependency
       {:jason, "~> 1.4"},
 
-      # Optional: enables `mix igniter.install muex` / `mix muex.install`
-      {:igniter, "~> 0.8", optional: true},
+      # Optional: enables `mix igniter.install muex` / `mix muex.install`.
+      # Kept permissive (the install task is the only igniter user, and it is
+      # guarded by `Code.ensure_loaded?(Igniter)`) so muex can coexist in
+      # projects pinned to an older igniter by their own transitive deps.
+      {:igniter, "~> 0.5", optional: true},
 
       # Development and documentation
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
