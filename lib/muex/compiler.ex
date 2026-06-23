@@ -138,10 +138,9 @@ defmodule Muex.Compiler do
   defp apply_mutation(ast, mutation) do
     original_ast = Map.get(mutation, :original_ast)
     mutated_ast = Map.get(mutation, :ast)
-    mutation_line = get_in(mutation, [:location, :line])
 
     Macro.prewalk(ast, fn node ->
-      if matches_mutation?(node, original_ast, mutation_line) do
+      if matches_mutation?(node, original_ast) do
         mutated_ast
       else
         node
@@ -149,9 +148,23 @@ defmodule Muex.Compiler do
     end)
   end
 
-  defp matches_mutation?(node, original_ast, mutation_line) do
-    node_line = get_node_line(node)
-    node_line == mutation_line && structurally_equal?(node, original_ast)
+  # Locate the exact node we mutated: same structure AND same source line.
+  #
+  # We key on the *original node's own* line — `get_node_line(original_ast)` —
+  # rather than the mutation's human-facing `location.line`. Most mutators set
+  # both to the same value, but some (notably StatementDeletion) deliberately
+  # report the line of an inner statement for display while `original_ast` is
+  # the enclosing `__block__`. Matching on the reported line would then never
+  # find the block, so the mutation would silently fail to apply and the
+  # unchanged file would pass every test — a false "survived". Using the
+  # original node's line keeps the structural match correctly disambiguated
+  # (two identical expressions on different lines stay distinct) for every
+  # mutator while letting block-level mutations actually take effect.
+  defp matches_mutation?(_node, nil), do: false
+
+  defp matches_mutation?(node, original_ast) do
+    structurally_equal?(node, original_ast) and
+      get_node_line(node) == get_node_line(original_ast)
   end
 
   defp get_node_line({_form, meta, _args}) when is_list(meta) do
