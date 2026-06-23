@@ -157,6 +157,87 @@ defmodule Muex.Mutator.StatementDeletionTest do
     end
   end
 
+  describe "equivalent?/1 - clause absorbed by a following catch-all" do
+    # Builds the block, runs mutate/2, and returns the mutation that deletes
+    # `target` (a clause AST) with original_ast attached (as the real pipeline
+    # does in Muex.Mutator.walk/3).
+    defp deletion_of(statements, target) do
+      block = {:__block__, [line: 1], statements}
+
+      block
+      |> StatementDeletion.mutate(@context)
+      |> Enum.map(&Map.put(&1, :original_ast, block))
+      |> Enum.find(fn m -> m.ast == drop(statements, target) end)
+    end
+
+    defp drop(statements, target) do
+      case List.delete(statements, target) do
+        [single] -> single
+        many -> {:__block__, [line: 1], many}
+      end
+    end
+
+    test "true: deleting a specific clause an identical-bodied catch-all absorbs" do
+      specific = quote do: def(handle_info({:EXIT, _pid, _reason}, state), do: {:noreply, state})
+      catch_all = quote do: def(handle_info(_msg, state), do: {:noreply, state})
+      trailing = quote do: :ok
+
+      mutation = deletion_of([specific, catch_all, trailing], specific)
+      assert StatementDeletion.equivalent?(mutation)
+    end
+
+    test "false: the catch-all returns a different body" do
+      specific = quote do: def(handle_info({:EXIT, _p, _r}, state), do: {:noreply, state})
+      catch_all = quote do: def(handle_info(_msg, state), do: {:stop, :normal, state})
+      trailing = quote do: :ok
+
+      mutation = deletion_of([specific, catch_all, trailing], specific)
+      refute StatementDeletion.equivalent?(mutation)
+    end
+
+    test "false: the following clause carries a guard (not a true catch-all)" do
+      specific = quote do: def(handle({:a, _x}, state), do: {:ok, state})
+      guarded = quote do: def(handle(msg, state) when is_atom(msg), do: {:ok, state})
+      trailing = quote do: :ok
+
+      mutation = deletion_of([specific, guarded, trailing], specific)
+      refute StatementDeletion.equivalent?(mutation)
+    end
+
+    test "false: the body reads an argument bound at a different position" do
+      specific = quote do: def(f(_x, state), do: {:noreply, state})
+      catch_all = quote do: def(f(state, _x), do: {:noreply, state})
+      trailing = quote do: :ok
+
+      mutation = deletion_of([specific, catch_all, trailing], specific)
+      refute StatementDeletion.equivalent?(mutation)
+    end
+
+    test "false: no following clause of the same function to absorb it" do
+      specific = quote do: def(handle_info({:EXIT, _p, _r}, state), do: {:noreply, state})
+      other = quote do: def(unrelated(x), do: x)
+      trailing = quote do: :ok
+
+      mutation = deletion_of([specific, other, trailing], specific)
+      refute StatementDeletion.equivalent?(mutation)
+    end
+
+    test "false: deleting an ordinary in-function statement (not a clause)" do
+      ast =
+        {:__block__, [line: 1],
+         [
+           {:=, [line: 1], [{:x, [], Elixir}, 1]},
+           {:=, [line: 2], [{:y, [], Elixir}, 2]},
+           {:+, [line: 3], [{:x, [], Elixir}, {:y, [], Elixir}]}
+         ]}
+
+      mutations =
+        Enum.map(StatementDeletion.mutate(ast, @context), &Map.put(&1, :original_ast, ast))
+
+      refute Enum.any?(mutations, &StatementDeletion.equivalent?/1)
+    end
+  end
+
   describe "name/0" do
     test "returns mutator name" do
       assert "StatementDeletion" = StatementDeletion.name()
