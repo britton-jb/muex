@@ -9,6 +9,18 @@ defmodule Muex.Mutator.StatementDeletion do
   This is one of the highest-value mutation operators: if deleting a
   statement doesn't cause any test to fail, that statement is either
   dead code or untested side-effect logic.
+
+  ## Module attributes are not mutated
+
+  A `defmodule` body is itself a `__block__`, so without a guard this
+  mutator would delete `@moduledoc` / `@doc` / `@spec` / `@type` /
+  `@behaviour` / constant attributes. Deleting a non-executable attribute
+  (docs, specs, types) has no runtime effect, so it can never be caught by
+  a test — it only manufactures unkillable survivors that drag the score
+  down without pointing at a real coverage gap. Deleting a *used* constant
+  attribute (`@timeout 5_000`) just yields a guaranteed compile error
+  (an "invalid" mutant). Neither is a meaningful test-quality signal, so
+  `@`-attribute statements are skipped entirely.
   """
   @behaviour Muex.Mutator
 
@@ -23,10 +35,15 @@ defmodule Muex.Mutator.StatementDeletion do
 
   @impl true
   def mutate({:__block__, meta, statements}, context) when length(statements) >= 2 do
+    last_idx = length(statements) - 1
+
     statements
     |> Enum.with_index()
-    # Skip the last statement — that's the return value
-    |> Enum.reject(fn {_stmt, idx} -> idx == length(statements) - 1 end)
+    # Skip the last statement (that's the return value, handled by ReturnValue)
+    # and skip module attributes (@moduledoc/@doc/@spec/@type/@behaviour/consts):
+    # deleting a non-executable attribute can't be caught by any test, so it only
+    # produces unkillable survivors. See the moduledoc.
+    |> Enum.reject(fn {stmt, idx} -> idx == last_idx or module_attribute?(stmt) end)
     |> Enum.map(fn {stmt, idx} ->
       remaining = List.delete_at(statements, idx)
       mutated_ast = simplify_block(meta, remaining)
@@ -42,6 +59,13 @@ defmodule Muex.Mutator.StatementDeletion do
   end
 
   def mutate(_ast, _context), do: []
+
+  # A `@`-prefixed module attribute (@moduledoc, @doc, @spec, @type,
+  # @behaviour, @enforce_keys, named constants, …). Deleting one is never a
+  # useful mutation: docs/specs/types are non-executable (unkillable
+  # survivors) and used constants only break compilation (invalid mutants).
+  defp module_attribute?({:@, _meta, _args}), do: true
+  defp module_attribute?(_), do: false
 
   # A block with one remaining statement collapses to that statement.
   defp simplify_block(_meta, [single]), do: single

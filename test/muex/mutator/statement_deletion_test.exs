@@ -105,6 +105,43 @@ defmodule Muex.Mutator.StatementDeletionTest do
     end
   end
 
+  describe "mutate/2 - module attributes are skipped" do
+    test "does not delete @doc / @spec / @type / @moduledoc / constant attrs" do
+      # A `defmodule` body is a __block__; without the guard each of these
+      # @-attributes would become a deletion mutation. They must be skipped.
+      attr = fn name, arg -> {:@, [line: 1], [{name, [line: 1], [arg]}]} end
+
+      moduledoc = attr.(:moduledoc, "hi")
+      doc = attr.(:doc, "a function")
+      spec = attr.(:spec, {:foo, [line: 2], []})
+      type = attr.(:type, {:t, [line: 3], []})
+      const = attr.(:timeout, 5_000)
+      real_stmt = {:=, [line: 6], [{:x, [], Elixir}, 1]}
+      ret = {:x, [line: 7], Elixir}
+
+      ast = {:__block__, [line: 1], [moduledoc, doc, spec, type, const, real_stmt, ret]}
+
+      mutations = StatementDeletion.mutate(ast, @context)
+
+      # Only the one executable, non-final statement (real_stmt) is mutated.
+      assert [mutation] = mutations
+      assert mutation.description =~ "delete statement 6 of 7"
+      refute Enum.any?(mutations, fn m -> m.description =~ "statement 1 of" end)
+    end
+
+    test "a block of only attributes plus a return value yields no mutations" do
+      ast =
+        {:__block__, [line: 1],
+         [
+           {:@, [line: 1], [{:moduledoc, [line: 1], ["x"]}]},
+           {:@, [line: 2], [{:spec, [line: 2], [{:f, [line: 2], []}]}]},
+           {:def, [line: 3], [{:f, [line: 3], []}]}
+         ]}
+
+      assert [] = StatementDeletion.mutate(ast, @context)
+    end
+  end
+
   describe "mutate/2 - non-matching nodes" do
     test "single-statement block returns empty" do
       ast = {:__block__, [line: 1], [{:x, [], Elixir}]}
