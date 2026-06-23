@@ -222,6 +222,34 @@ defmodule Muex.Mutator.StatementDeletionTest do
       refute StatementDeletion.equivalent?(mutation)
     end
 
+    test "true: a *guarded* clause is still absorbed by the catch-all" do
+      specific = quote do: def(handle({:a, _x}, state) when is_pid(state), do: {:noreply, state})
+      catch_all = quote do: def(handle(_msg, state), do: {:noreply, state})
+      trailing = quote do: :ok
+
+      mutation = deletion_of([specific, catch_all, trailing], specific)
+      assert StatementDeletion.equivalent?(mutation)
+    end
+
+    test "false: the catch-all binds the body's variable under a different name" do
+      # Bodies are textually identical but the catch-all never binds `state`,
+      # so it can't feed the body the same value.
+      specific = quote do: def(f(_x, state), do: {:noreply, state})
+      catch_all = quote do: def(f(_y, conn), do: {:noreply, state})
+      trailing = quote do: :ok
+
+      mutation = deletion_of([specific, catch_all, trailing], specific)
+      refute StatementDeletion.equivalent?(mutation)
+    end
+
+    test "true: deleting one of two identical clauses (the twin absorbs it)" do
+      clause = quote do: def(f(x), do: x)
+      trailing = quote do: :ok
+
+      mutation = deletion_of([clause, clause, trailing], clause)
+      assert StatementDeletion.equivalent?(mutation)
+    end
+
     test "false: deleting an ordinary in-function statement (not a clause)" do
       ast =
         {:__block__, [line: 1],

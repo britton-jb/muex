@@ -148,18 +148,13 @@ defmodule Muex.Compiler do
     end)
   end
 
-  # Locate the exact node we mutated: same structure AND same source line.
-  #
-  # We key on the *original node's own* line — `get_node_line(original_ast)` —
-  # rather than the mutation's human-facing `location.line`. Most mutators set
-  # both to the same value, but some (notably StatementDeletion) deliberately
-  # report the line of an inner statement for display while `original_ast` is
-  # the enclosing `__block__`. Matching on the reported line would then never
-  # find the block, so the mutation would silently fail to apply and the
-  # unchanged file would pass every test — a false "survived". Using the
-  # original node's line keeps the structural match correctly disambiguated
-  # (two identical expressions on different lines stay distinct) for every
-  # mutator while letting block-level mutations actually take effect.
+  # Locate the exact node we mutated by structure AND its *own* source line.
+  # We key on `get_node_line(original_ast)`, not the mutation's human-facing
+  # `location.line`: StatementDeletion reports an inner statement's line for
+  # display while `original_ast` is the enclosing `__block__`, so matching on
+  # the reported line would never find the block — the mutation would silently
+  # fail to apply and read as a false "survived". The line still disambiguates
+  # two structurally-identical expressions on different lines.
   defp matches_mutation?(_node, nil), do: false
 
   defp matches_mutation?(node, original_ast) do

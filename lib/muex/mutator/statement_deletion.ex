@@ -39,10 +39,8 @@ defmodule Muex.Mutator.StatementDeletion do
 
     statements
     |> Enum.with_index()
-    # Skip the last statement (that's the return value, handled by ReturnValue)
-    # and skip module attributes (@moduledoc/@doc/@spec/@type/@behaviour/consts):
-    # deleting a non-executable attribute can't be caught by any test, so it only
-    # produces unkillable survivors. See the moduledoc.
+    # Skip the return value (ReturnValue handles it) and module attributes (see
+    # the moduledoc — deleting them only manufactures unkillable survivors).
     |> Enum.reject(fn {stmt, idx} -> idx == last_idx or module_attribute?(stmt) end)
     |> Enum.map(fn {stmt, idx} ->
       remaining = List.delete_at(statements, idx)
@@ -159,29 +157,23 @@ defmodule Muex.Mutator.StatementDeletion do
   defp var_positions(args) do
     args
     |> Enum.with_index()
-    |> Enum.reduce(%{}, fn
-      {{name, _meta, ctx}, i}, acc when is_atom(name) and is_atom(ctx) -> Map.put(acc, name, i)
-      {_other, _i}, acc -> acc
+    |> Enum.reduce(%{}, fn {arg, i}, acc ->
+      if bare_var?(arg), do: Map.put(acc, var_name(arg), i), else: acc
     end)
   end
 
   defp free_vars(body) do
     {_ast, vars} =
-      Macro.prewalk(body, MapSet.new(), fn
-        {name, _meta, ctx} = node, acc when is_atom(name) and is_atom(ctx) ->
-          {node, MapSet.put(acc, name)}
-
-        node, acc ->
-          {node, acc}
+      Macro.prewalk(body, MapSet.new(), fn node, acc ->
+        if bare_var?(node), do: {node, MapSet.put(acc, var_name(node))}, else: {node, acc}
       end)
 
     MapSet.to_list(vars)
   end
 
-  # A `@`-prefixed module attribute (@moduledoc, @doc, @spec, @type,
-  # @behaviour, @enforce_keys, named constants, …). Deleting one is never a
-  # useful mutation: docs/specs/types are non-executable (unkillable
-  # survivors) and used constants only break compilation (invalid mutants).
+  defp var_name({name, _meta, _ctx}), do: name
+
+  # Any `@`-prefixed module attribute (see the moduledoc).
   defp module_attribute?({:@, _meta, _args}), do: true
   defp module_attribute?(_), do: false
 
